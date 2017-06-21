@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
@@ -11,11 +12,13 @@ namespace project64Watch_Dummy_Client
         static TcpClient tcpClient = new TcpClient();
         static String host = "127.0.0.1";
         static Int32 port = 6520;
+        static String BatFile = "restart.bat";
         static UInt32 pMagic = 0x34364A50;//"PJ64"
         static UInt32 pCommand;
         static Random rand = new Random();
         static Byte[] BattleTeams;
         static Byte[] BattleText;
+        static UInt32 PingTimer;
 
         static void Main(string[] args)
         {
@@ -30,16 +33,26 @@ namespace project64Watch_Dummy_Client
                 {
                     port = Convert.ToInt32(args[i + 1]);
                 }
+
+                if (args[i] == "-f")
+                {
+                    BatFile = args[i + 1];
+                }
             }
 
             Connect();
+
+            Thread thread = new Thread(Ping);
+            thread.Start();
 
             while (true)
             {
                 while (Available() == 0x00)
                 {
+                    PingTimer++;
                     Thread.Sleep(1);
                 }
+                PingTimer = 0;
                 Byte[] Reply = new Byte[Available()];
                 ReadPacket(Reply);
                 if (BitConverter.ToUInt32(Reply, 0x00) == 0x34364A50)
@@ -49,14 +62,14 @@ namespace project64Watch_Dummy_Client
                     {
                         case 0x00://Hello
                             {
-                                Console.WriteLine("Hello");
+                                //Console.WriteLine("Hello");
                                 MakeTeams();
                             }
                             break;
 
                         case 0x01://Team Update
                             {
-                                Console.WriteLine("Team Update");
+                                //Console.WriteLine("Team Update");
                                 BattleTeams = GetData(Reply);
                             }
                             break;
@@ -88,6 +101,12 @@ namespace project64Watch_Dummy_Client
                                     Console.WriteLine("\n2P Wins!\n");
                                 }
                                 MakeTeams();
+                            }
+                            break;
+
+                        case 0x07://Ping
+                            {
+                                //Ignore
                             }
                             break;
                     }
@@ -123,8 +142,8 @@ namespace project64Watch_Dummy_Client
 
         static void Connect()
         {
-            UInt32 TimeoutCounter = 0;
-            UInt32 ResendCounter = 0;
+            UInt32 ConnectCounter = 0;
+            UInt32 RetryCounter = 0;
 
             tcpClient = new TcpClient();
 
@@ -132,23 +151,25 @@ namespace project64Watch_Dummy_Client
             {
                 try
                 {
-
                     Thread.Sleep(1);
-                    TimeoutCounter++;
-                    if (TimeoutCounter > 500)
+                    ConnectCounter++;
+                    if (ConnectCounter > 500)
                     {
-                        if (ResendCounter < 5)
+                        if (RetryCounter < 2)
                         {
                             //Console.WriteLine("Connecting...");
-                            ResendCounter++;
+                            RetryCounter++;
                             tcpClient.Connect(host, port);
-                            Thread.Sleep(100);
+                            Thread.Sleep(1000);
                         }
                         else
                         {
-                            ///Failed 5 times
+                            //Console.WriteLine("Starting...");
+                            StartPJ64();
+                            Thread.Sleep(1000);
+                            RetryCounter = 0;
                         }
-                        TimeoutCounter = 0;
+                        ConnectCounter = 0;
                     }
                 }
                 catch (Exception)
@@ -220,6 +241,37 @@ namespace project64Watch_Dummy_Client
             {
                 return 0;
             }
+        }
+
+        static void Ping()
+        {
+            while(true)
+            {
+                Thread.Sleep(500);
+                if (PingTimer >= 2000)
+                {
+                    //Console.WriteLine("Reconnecting...");
+                    StartPJ64();
+                    Thread.Sleep(1000);
+                    Connect();
+                    PingTimer = 0;
+                }
+                else if (PingTimer >= 1000)
+                {
+                    //Console.WriteLine("Pinging...");
+                    UInt32 sCommand = (0x07 << 0x18);
+                    Byte[] sBuffer = new Byte[0x0C];
+                    Array.Copy(BitConverter.GetBytes(pMagic), 0x00, sBuffer, 0x00, 0x04);
+                    Array.Copy(BitConverter.GetBytes(sCommand), 0x00, sBuffer, 0x04, 0x04);
+                    SendPacket(sBuffer);
+                }
+            }
+        }
+
+        static void StartPJ64()
+        {
+            BatFile = "C:\\Users\\Kazo\\Git\\project64\\Bin\\Release\\restart.bat";
+            Process myProcess = Process.Start(BatFile);
         }
     }
 }
