@@ -270,7 +270,6 @@ namespace project64Watch_Dummy_Client
 
         static void StartPJ64()
         {
-            BatFile = "C:\\Users\\Kazo\\Git\\project64\\Bin\\Release\\restart.bat";
             Process myProcess = Process.Start(BatFile);
         }
     }
