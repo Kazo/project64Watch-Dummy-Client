@@ -13,6 +13,7 @@ namespace project64Watch_Dummy_Client
         static String host = "127.0.0.1";
         static Int32 port = 6520;
         static String BatFile = "restart.bat";
+        static String JSONFile = "teams.json";
         static UInt32 pMagic = 0x34364A50;//"PJ64"
         static UInt32 pCommand;
         static Random rand = new Random();
@@ -34,9 +35,14 @@ namespace project64Watch_Dummy_Client
                     port = Convert.ToInt32(args[i + 1]);
                 }
 
-                if (args[i] == "-f")
+                if (args[i] == "-bat")
                 {
                     BatFile = args[i + 1];
+                }
+
+                if (args[i] == "-json")
+                {
+                    JSONFile = args[i + 1];
                 }
             }
 
@@ -116,27 +122,27 @@ namespace project64Watch_Dummy_Client
 
         static void MakeTeams()
         {
+            PKMMaker pkmmaker = new PKMMaker();
+            String JSONString = File.ReadAllText(JSONFile);
             Byte[] TeamData = new Byte[0x60 * 3];
             Byte[] PokemonData;
-            String[] FilePaths = Directory.GetFiles("SSD2", "*.pk2", SearchOption.AllDirectories);
-            do
+            UInt16 ivs;
+            pkmmaker.ReadJSON(JSONString);
+
+            for (int i = 0; i < 3; i++)
             {
-                for (int i = 0; i < 3; i++)
-                {
-                    PokemonData = File.ReadAllBytes(FilePaths[rand.Next(FilePaths.Length)]);
-                    Array.Copy(PokemonData, 0x00, TeamData, (0x60 * i), 0x60);
-                }
-            } while ((TeamData[0x00] == TeamData[0x60]) || (TeamData[0x00] == TeamData[0xC0]) || (TeamData[0x60] == TeamData[0xC0]));//No Same Pokémons
+                ivs = (ushort)(pkmmaker.teams.player1[i].ivs.spcl + (pkmmaker.teams.player1[i].ivs.spe << 0x04) + (pkmmaker.teams.player1[i].ivs.def << 0x08) + (pkmmaker.teams.player1[i].ivs.atk << 0x0C));
+                PokemonData = pkmmaker.MakePKM(pkmmaker.teams.player1[i].species.id, pkmmaker.teams.player1[i].item.id, pkmmaker.teams.player1[i].moves[0].id, pkmmaker.teams.player1[i].moves[1].id, pkmmaker.teams.player1[i].moves[2].id, pkmmaker.teams.player1[i].moves[3].id, ivs);
+                Array.Copy(PokemonData, 0x00, TeamData, (0x60 * i), 0x60);
+            }
             SendTeam(0, TeamData);
 
-            do
+            for (int i = 0; i < 3; i++)
             {
-                for (int i = 0; i < 3; i++)
-                {
-                    PokemonData = File.ReadAllBytes(FilePaths[rand.Next(FilePaths.Length)]);
-                    Array.Copy(PokemonData, 0x00, TeamData, (0x60 * i), 0x60);
-                }
-            } while ((TeamData[0x00] == TeamData[0x60]) || (TeamData[0x00] == TeamData[0xC0]) || (TeamData[0x60] == TeamData[0xC0]));//No Same Pokémons
+                ivs = (ushort)(pkmmaker.teams.player2[i].ivs.spcl + (pkmmaker.teams.player2[i].ivs.spe << 0x04) + (pkmmaker.teams.player2[i].ivs.def << 0x08) + (pkmmaker.teams.player2[i].ivs.atk << 0x0C));
+                PokemonData = pkmmaker.MakePKM(pkmmaker.teams.player2[i].species.id, pkmmaker.teams.player2[i].item.id, pkmmaker.teams.player2[i].moves[0].id, pkmmaker.teams.player2[i].moves[1].id, pkmmaker.teams.player2[i].moves[2].id, pkmmaker.teams.player2[i].moves[3].id, ivs);
+                Array.Copy(PokemonData, 0x00, TeamData, (0x60 * i), 0x60);
+            }
             SendTeam(1, TeamData);
         }
 
